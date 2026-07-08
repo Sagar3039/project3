@@ -30,7 +30,19 @@ Bob AI Assistant is a personal productivity and chat assistant with the followin
 
 ---
 
-## 3. Technology Stack
+## 3. Screenshots
+
+![Bob AI Assistant](screenshots/home.png)
+
+**Main UI Overview:**
+- Left sidebar with session history and new chat creation
+- Central chat area showing messages and AI responses
+- Model selector and voice controls in the top bar
+- Input field with voice and send options at the bottom
+
+---
+
+## 4. Technology Stack
 
 - Frontend: React + Vite
 - Desktop shell: Electron
@@ -42,7 +54,7 @@ Bob AI Assistant is a personal productivity and chat assistant with the followin
 
 ---
 
-## 4. Architecture
+## 5. Architecture
 
 The app follows a split-process desktop architecture:
 
@@ -72,7 +84,7 @@ flowchart LR
 
 ---
 
-## 5. System Design
+## 6. System Design
 
 ### 5.1 Client-Server Model
 
@@ -120,7 +132,7 @@ These are stored in memory.json and later injected into the prompt context when 
 
 ---
 
-## 6. Project Structure
+## 7. Project Structure
 
 ```text
 project3/
@@ -159,7 +171,7 @@ project3/
 
 ---
 
-## 7. Prerequisites
+## 8. Prerequisites
 
 Before running the app, make sure you have:
 
@@ -177,7 +189,7 @@ If Ollama is not already running, the app will try to start it automatically dur
 
 ---
 
-## 8. Installation
+## 9. Installation
 
 Clone the repository:
 
@@ -194,7 +206,7 @@ npm install
 
 ---
 
-## 9. Development Workflow
+## 10. Development Workflow
 
 Run the app in development mode:
 
@@ -219,7 +231,7 @@ npm run dist:win
 
 ---
 
-## 10. Build and Packaging
+## 11. Build and Packaging
 
 ### Build frontend
 
@@ -249,7 +261,7 @@ The current packaging configuration targets:
 
 ---
 
-## 11. Data Storage
+## 12. Data Storage
 
 The app stores data locally in the user data directory:
 
@@ -260,7 +272,7 @@ This allows the assistant to preserve memory and chat history across launches wi
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 ### Ollama not detected
 - Make sure Ollama is installed.
@@ -289,7 +301,7 @@ ollama pull gemma4:31b-cloud
 
 ---
 
-## 13. Future Improvements
+## 14. Future Improvements
 
 Possible enhancements for the project include:
 
@@ -302,7 +314,7 @@ Possible enhancements for the project include:
 
 ---
 
-## 14. License
+## 15. License
 
 This project is licensed under the MIT License.
 
