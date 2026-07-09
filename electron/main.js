@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, globalShortcut, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const composio = require('./composio');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -54,6 +55,45 @@ function writeMemory(memory) {
   fs.mkdirSync(path.dirname(MEMORY_FILE), { recursive: true });
   fs.writeFileSync(MEMORY_FILE, JSON.stringify(memory, null, 2), 'utf-8');
 }
+
+const OLLAMA_BASE = 'http://localhost:11434';
+const DEFAULT_MODEL = 'gemma4:31b-cloud';
+
+const SYSTEM_PROMPT = `You are Bob — a personal AI assistant. Part JARVIS, part brutally honest best friend. You are built by Sagar Karmakar as part of his Bob AI project. You are running locally on his machine using Ollama.
+
+## Your Capabilities
+- You can speak aloud using Edge TTS (Microsoft's text-to-speech). When the user enables auto-speak, your responses are spoken in real-time using a deep British male voice (en-GB-ThomasNeural).
+- You can listen: the user can speak to you via microphone. You receive their speech as text (converted by Whisper STT).
+- You remember things across conversations. Past conversations are stored and you can recall facts, stories, goals, and preferences from them. When the user asks "what did we talk about before" or references a past topic, you have access to that context.
+- You run entirely locally — no API keys, no cloud. Ollama powers your brain, Edge TTS powers your voice, Whisper powers your ears.
+- You are loaded on the model: gemma4:31b-cloud.
+
+## Your Personality
+- Be direct. No corporate fluff. Talk like a smart friend who happens to know everything.
+- When Sagar shares his marks, grades, or goals — acknowledge them, contextualize them, and give honest feedback.
+- If he's slacking, call him out. If he's doing well, give him credit. No participation trophies.
+- Use **bold** for emphasis. Use headers and lists when explaining things.
+- You can roleplay, joke around, and be creative — but always come back to being useful.
+- Never pretend to have capabilities you don't have. If you can't do something, say so.
+- When asked about past conversations, reference the context provided to you naturally — don't say "I don't have memory" if the context is there.
+
+## About Sagar Karmakar
+- BCA student at Midnapore College (Autonomous), Vidyasagar University, graduating 2026
+- Career goal: Software Engineer at Microsoft
+- Wants to pursue MSc Computer Science abroad — preferred countries: Germany, Italy, France, Austria, Finland, Ireland, Netherlands
+- GitHub: https://github.com/Sagar3039
+- Portfolio: https://sagarportfolio2004.netlify.app/
+- Email: sagarkarmakar3.10.2004@gmail.com
+- Skills: Python, Java, C++, React, FastAPI, Android, Git
+- Projects: Bob AI, RacePulse, Portfolio, AI Voice Assistant
+
+## How You Should Respond
+- Keep responses focused and useful. Don't ramble unless the conversation calls for it.
+- For code, give clean working code with brief explanations.
+- For career advice, be brutally practical — not motivational poster material.
+- For study abroad, give actionable steps, not generic "research universities" advice.
+- Remember Sagar's context: he's a BCA student from India aiming for Microsoft and a European MSc.
+- NEVER use asterisks (*), ampersands (&), or at signs (@) in your responses. Use plain English words instead. Say "and" not "&", say "at" not "@", use plain text formatting instead of markdown bold/italic.`;
 
 const STOPWORDS = new Set(['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now', 'hey', 'bob', 'hii', 'hiii', 'hiiii', 'yoo', 'yo', 'hello', 'hi', 'yes', 'no', 'yeah', 'ok', 'okay', 'lol', 'lmao', 'haha', 'hmm', 'um', 'uh', 'ah', 'oh']);
 
@@ -321,6 +361,67 @@ function createWindow() {
   });
 }
 
+// ─── Spotlight Popup ────────────────────────────────────────────────
+let popupWin = null;
+
+function createPopup() {
+  if (popupWin && !popupWin.isDestroyed()) {
+    popupWin.focus();
+    return;
+  }
+
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+
+  popupWin = new BrowserWindow({
+    width: 600,
+    height: 420,
+    x: Math.round((screenW - 600) / 2),
+    y: Math.round((screenH - 420) / 2),
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    backgroundColor: '#0f1115',
+    webPreferences: {
+      preload: path.join(__dirname, 'popup-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  });
+
+  popupWin.loadFile(path.join(__dirname, 'popup.html'));
+
+  popupWin.once('ready-to-show', () => {
+    popupWin.show();
+    popupWin.focus();
+  });
+
+  popupWin.on('closed', () => {
+    popupWin = null;
+  });
+}
+
+function togglePopup() {
+  if (popupWin && !popupWin.isDestroyed()) {
+    if (popupWin.isVisible()) {
+      popupWin.hide();
+    } else {
+      popupWin.show();
+      popupWin.focus();
+    }
+  } else {
+    createPopup();
+  }
+}
+
+ipcMain.on('popup:hide', () => {
+  if (popupWin && !popupWin.isDestroyed()) {
+    popupWin.hide();
+  }
+});
+
 // Session IPC handlers
 ipcMain.handle('sessions:load', () => readSessions());
 ipcMain.handle('sessions:save', (_, sessions) => {
@@ -405,6 +506,150 @@ ipcMain.handle('tts:stop', async () => {
   return true;
 });
 
+// ─── Popup Chat (streams via webContents.send) ──────────────────────
+ipcMain.handle('popup:chat', async (event, query, model) => {
+  const webContents = event.sender;
+  const usedModel = model || DEFAULT_MODEL;
+
+  let memoryContext = '';
+  try {
+    memoryContext = getMemoryContext(query, 'popup');
+  } catch {}
+
+  // Get Composio tools
+  let toolPrompt = '';
+  try {
+    const tools = await composio.getToolsForPrompt();
+    toolPrompt = composio.buildToolPrompt(tools);
+  } catch {}
+
+  const basePrompt = SYSTEM_PROMPT;
+  const fullPrompt = [
+    memoryContext ? `Here is what I remember from past conversations:\n${memoryContext}\n\nNow respond as Bob with this context available.\n\n${basePrompt}` : basePrompt,
+    toolPrompt
+  ].filter(Boolean).join('\n\n');
+
+  const messages = [
+    { role: 'system', content: fullPrompt },
+    { role: 'user', content: query }
+  ];
+
+  let fullResponse = '';
+
+  try {
+    const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: usedModel, messages, stream: true })
+    });
+
+    if (!res.ok || !res.body) {
+      webContents.send('popup:chunk', { error: `Ollama request failed (${res.status})` });
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const json = JSON.parse(line);
+          if (json.message?.content) {
+            fullResponse += json.message.content;
+            webContents.send('popup:chunk', { text: json.message.content });
+          }
+          if (json.done) {
+            webContents.send('popup:chunk', { done: true });
+          }
+        } catch {}
+      }
+    }
+
+    // Check for tool calls in the response
+    const toolCall = composio.parseToolCall(fullResponse);
+    if (toolCall) {
+      webContents.send('popup:chunk', { toolCall: toolCall.toolName });
+      const result = await composio.executeTool(toolCall.toolName, toolCall.args);
+      webContents.send('popup:chunk', {
+        toolResult: {
+          name: toolCall.toolName,
+          success: result.success,
+          data: result.success ? result.result : result.error
+        }
+      });
+    }
+  } catch (e) {
+    webContents.send('popup:chunk', { error: e.message });
+  }
+});
+
+ipcMain.handle('popup:tts', async (_, text) => {
+  const tmpFile = path.join(app.getPath('temp'), `popup_tts_${Date.now()}.mp3`);
+  try {
+    const EdgeTTSService = await getEdgeTTS();
+    const tts = new EdgeTTSService({
+      voice: 'en-GB-ThomasNeural',
+      lang: 'en-GB',
+      outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+      rate: 'default',
+      pitch: 'default',
+      volume: 'default',
+      timeout: 30000
+    });
+    await tts.ttsPromise(text, tmpFile);
+    const audioBuffer = fs.readFileSync(tmpFile);
+    try { fs.unlinkSync(tmpFile); } catch {}
+    return audioBuffer.toString('base64');
+  } catch (e) {
+    try { fs.unlinkSync(tmpFile); } catch {}
+    throw e;
+  }
+});
+
+ipcMain.handle('popup:getModel', async () => {
+  try {
+    const res = await fetch(`${OLLAMA_BASE}/api/ps`);
+    if (res.ok) {
+      const data = await res.json();
+      const models = data.models || [];
+      if (models.length > 0) return models[0].name;
+    }
+  } catch {}
+  return DEFAULT_MODEL;
+});
+
+// ─── Composio IPC handlers ──────────────────────────────────────────
+ipcMain.handle('composio:getTools', async (_, toolkits) => {
+  return await composio.getToolsForPrompt(toolkits);
+});
+
+ipcMain.handle('composio:buildPrompt', async () => {
+  const tools = await composio.getToolsForPrompt();
+  return composio.buildToolPrompt(tools);
+});
+
+ipcMain.handle('composio:execute', async (_, toolName, args) => {
+  return await composio.executeTool(toolName, args);
+});
+
+ipcMain.handle('composio:connectUrl', async (_, toolkit) => {
+  return await composio.getConnectUrl(toolkit);
+});
+
+ipcMain.handle('composio:status', async (_, toolkit) => {
+  return await composio.getConnectionStatus(toolkit);
+});
+
 // ─── Whisper STT (runs in main process) ─────────────────────────────
 let whisperPipeline = null;
 
@@ -469,11 +714,17 @@ ipcMain.handle('stt:transcribe', async (_, audioBase64) => {
 
 app.whenReady().then(() => {
   createWindow();
+
+  globalShortcut.register('Ctrl+Space', () => {
+    togglePopup();
+  });
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
+  globalShortcut.unregisterAll();
   if (process.platform !== 'darwin') app.quit();
 });

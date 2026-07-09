@@ -12,7 +12,7 @@ export function useVoice() {
   const [transcribing, setTranscribing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
-  const [ttsProvider, setTtsProvider] = useState('system'); // 'system' or 'edge'
+  const [ttsProvider, setTtsProvider] = useState('edge'); // 'system' or 'edge'
 
   // System voices
   const [systemVoices, setSystemVoices] = useState([]);

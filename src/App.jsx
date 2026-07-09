@@ -35,7 +35,8 @@ const SYSTEM_PROMPT = `You are Bob — a personal AI assistant. Part JARVIS, par
 - For code, give clean working code with brief explanations.
 - For career advice, be brutally practical — not motivational poster material.
 - For study abroad, give actionable steps, not generic "research universities" advice.
-- Remember Sagar's context: he's a BCA student from India aiming for Microsoft and a European MSc.`;
+- Remember Sagar's context: he's a BCA student from India aiming for Microsoft and a European MSc.
+- NEVER use asterisks (*), ampersands (&), or at signs (@) in your responses. Use plain English words instead. Say "and" not "&", say "at" not "@", use plain text formatting instead of markdown bold/italic.`;
 
 const DEFAULT_MODEL = 'gemma4:31b-cloud';
 const WELCOME_MSG = { role: 'assistant', content: "Bob here. Online and at your service. What shall we work on today?" };
@@ -114,7 +115,7 @@ export default function App() {
   const inputRef = useRef(null);
 
   // Temp voice settings (only applied on button click)
-  const [tempTtsProvider, setTempTtsProvider] = useState('system');
+  const [tempTtsProvider, setTempTtsProvider] = useState('edge');
   const [tempSystemVoice, setTempSystemVoice] = useState(null);
   const [tempRate, setTempRate] = useState(1.0);
   const [tempPitch, setTempPitch] = useState(1.0);
@@ -466,6 +467,14 @@ export default function App() {
       } catch {}
     }
 
+    // Get Composio tools
+    let toolPrompt = '';
+    if (api?.composio) {
+      try {
+        toolPrompt = await api.composio.buildPrompt();
+      } catch {}
+    }
+
     // Build dynamic personality prompt
     const personalityBlock = `## Current Identity
 You are "${personality.name}" — ${personality.tone}.
@@ -474,9 +483,10 @@ Emoji usage: ${personality.emoji ? 'Use emojis naturally in responses.' : 'Do NO
 ${personality.custom ? `Special instruction: ${personality.custom}` : ''}`;
 
     const basePrompt = personalityBlock + '\n\n' + SYSTEM_PROMPT;
-    const systemPrompt = memoryContext
+    const memoryBlock = memoryContext
       ? `Here is what I remember from past conversations:\n${memoryContext}\n\nNow respond as ${personality.name} with this context available.\n\n${basePrompt}`
       : basePrompt;
+    const systemPrompt = memoryBlock + toolPrompt;
     const apiMessages = [{ role: 'system', content: systemPrompt }, ...newHistory];
 
     let fullReply = '';
@@ -511,6 +521,41 @@ ${personality.custom ? `Special instruction: ${personality.custom}` : ''}`;
           flushChunks(); // Play any remaining buffered text
         } else {
           speak(fullReply); // System voice — batch mode
+        }
+      }
+
+      // Check for Composio tool calls in the response
+      if (api?.composio && fullReply) {
+        const toolMatch = fullReply.match(/\[TOOL_CALL:\s*(\w+)\((.*?)\)\]/s);
+        if (toolMatch) {
+          const toolName = toolMatch[1];
+          const argsStr = toolMatch[2];
+          const args = {};
+          if (argsStr.trim()) {
+            const regex = /(\w+)\s*:\s*"([^"]*)"/g;
+            let m;
+            while ((m = regex.exec(argsStr)) !== null) {
+              args[m[1]] = m[2];
+            }
+          }
+          setMessages((prev) => [...prev, { role: 'assistant', content: `Executing ${toolName}...` }]);
+          try {
+            const result = await api.composio.execute(toolName, args);
+            const resultMsg = result.success
+              ? `${toolName} completed successfully.\n\nResult:\n${JSON.stringify(result.result, null, 2)}`
+              : `${toolName} failed: ${result.error}`;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { role: 'assistant', content: resultMsg };
+              return updated;
+            });
+          } catch (e) {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { role: 'assistant', content: `Tool execution error: ${e.message}` };
+              return updated;
+            });
+          }
         }
       }
     }

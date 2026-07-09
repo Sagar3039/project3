@@ -19,5 +19,12 @@ contextBridge.exposeInMainWorld('assistantAPI', {
   },
   stt: {
     transcribe: (audioBase64) => ipcRenderer.invoke('stt:transcribe', audioBase64)
+  },
+  composio: {
+    getTools: (toolkits) => ipcRenderer.invoke('composio:getTools', toolkits),
+    buildPrompt: () => ipcRenderer.invoke('composio:buildPrompt'),
+    execute: (toolName, args) => ipcRenderer.invoke('composio:execute', toolName, args),
+    connectUrl: (toolkit) => ipcRenderer.invoke('composio:connectUrl', toolkit),
+    status: (toolkit) => ipcRenderer.invoke('composio:status', toolkit)
   }
 });
